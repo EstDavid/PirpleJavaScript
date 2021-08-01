@@ -12,8 +12,8 @@ The elevator class contains all the variables and methods needed for the managem
 When instantiating a new object belonging to the Elevator class, we need the following parameters:
 * `name` - Name of the elevator. It can be anything, a number, a string... What is important is that this name is unique within an ElevatorManager object
 * `lowestFloor` - This parameter must be an integer number stating the lowest floor that the elevator can reach
-* `highestFloor` - This parameter must be an interger number stating the highest floor that the elevator can reach
-* `currentFloor` - This parameter must be an interger number stating the floor at which the elevator is being installed
+* `highestFloor` - This parameter must be an integer number stating the highest floor that the elevator can reach
+* `currentFloor` - This parameter must be an integer number stating the floor at which the elevator is being installed
 
 Example of Elevator instantiation:
 
@@ -108,4 +108,4 @@ In order to design this system closer to reality, it would be a good idea to cre
 * Doors - A Foors class would manage the orders to open and close doors and would notify any malfunction. It could also detect the presence of persons or objects in the trajectory of the door
 * Floor - This class would allow to model the buttons on each floor and would allow to create the elevator requests on a more realistic manner. It would also allow to manage the indicators on each floor, showing the floor and direction of each elevator and turning on the up or down button if a passenger has requested an elevator. This class would also allow to monitor the actual presence of the elevator on the floor
 
-Also, the simulation of the system could be improved. In order to do this, the creation of custom events and event handles would be a very sound approach to handle all possible situations, simplify the code and make it more realistic. Probably a Passenger class and a PassengerManager class would need to be created to carry out this simulation.
+Also, the simulation of the system could be improved. In order to do this, the creation of custom events and event handlers would be a very sound approach to handle all possible situations, simplify the code and make it more realistic. Probably a Passenger class and a PassengerManager class would need to be created to carry out this simulation.
