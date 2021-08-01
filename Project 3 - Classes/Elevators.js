@@ -13,64 +13,43 @@ function pause(interval) {
 }
 
 // Creating the elevator class
-    // The elevator class has the following parameters:
-        // [X] lowestFloor - It's the lowest floor the elevator is able to reach
-        // [X] highestFloor - It's the highest floor the elevator is able to reach
-        // [] currentFloor - This variable is used to know at which floor the elevator is
-        // [X] doorsOpen (boolean) - Is set to true or false depending on the state open or closed of the doors
-            // The elevator cannot move if this parameter is set to true
-        // [X] movingUp (boolean) - Is set to true if the elevator is moving up
-        // [X] movingDown (boolean) - Is set to true if the elevator is moving down
-        // [X] elevatorMalfunction - By default is set to false. If there is an emergency, the elevator won't move until the reset button is pushed and isAvailable is set back to false
-        // [X] floorsQueue {} - It contains all the floors that that the elevator can go to. If their value is set to true, the elevator will move there
-        // [X] nextFloor - This variable states the next floor that the elevator will move to
-    // The Elevator class has the following methods:
-        // [] closeDoors() - If doorsOpen is true, sends a signal to the doors to close 
-        // [] openDoors() - If doorsOpen is false, sends a signal to the doors to close
-        // [X] setDoorsOpened() - This method is used by the door system to signal that the doors have opened and set doorsOpen to true
-            // Once the state of doorsOpen changes, it is console logged
-        // [X] setDoorsClosed() - This method is used by the door system to signal that the doors have closed and set doorsOpen to false
-            // Once the state of doorsOpen changes, it is console logged
-        // [X] checkReadyToMove() - It makes all the necessary checks to make sure the elevator can start moving
-        // [X] moveToFloor(floor) - Sends the elevator move to the specified floor, if the floor is beyond the limit of the elevator.
-            // the elevator will go to the furthest floor possible
-            // After the trip it console.logs the move
-        // [X] moveDown() - Makes the elevator go fown one floor and decreases the currentFloor variable by 1
-        // [X] moveUp() - Makes the elevator go up and increases the currentFloor variable by 1
-        // [X] stop() - Stops the elevator. Sets the variables movingUp and movingDown to false, opens the doors
-        // [X] notifyMalfunction() - This method allows any system to set the elevatorMalfunction variable to true, opens the doors and console.logs the problem
-        // [] emergencyButton() - If elevatorMalfunction is true, this button sends the elevator to the closest floor and opens the doors
-        // [X] resetButton() - If doors are open and elevatorMalfunction is set to true, it sets elevatorMalfunction back to false
-    // Elements to be solved
-        // [] How does the elevator move again after completing one move?
 class Elevator {
     constructor(name, lowestFloor, highestFloor, currentFloor) {
         this.name = name;
         this.lowestFloor = lowestFloor;
         this.highestFloor = highestFloor;
         this.doorsOpen = true;
-        this.movingUp = false;
-        this.movingDown = false;
+        this.moving = false;
+        this.goingUp = false;
+        this.goingDown = false;
         this.elevatorMalfunction = false;
         this.currentFloor = currentFloor;
+        this.nextFloor = undefined;
         this.floorsQueue = {};
         for(let floor = lowestFloor; floor <= highestFloor; floor++) {
             this.floorsQueue[floor] = false;
         }
     }
     
+    // The openDoors() method checks that the doors are closed and that the elevator is not moving,
+    // and then sets the doorsOpen variable to true
     openDoors() {
-        if(!this.doorsOpen) {
+        if(!this.doorsOpen && !this.moving) {
             this.doorsOpen = true;
+            console.log(`Elevator ${this.name} opened the doors`);
         }       
     }
     
+    // The closeDoors() method checks that the doors are open and then sets the doorsOpen variable to false
     closeDoors() {
         if(this.doorsOpen) {
+            console.log(`Elevator ${this.name} closed the doors`);
             this.doorsOpen = false;
         }
     }
 
+    // emptyQueue() returns true if the queue of floors of the elevator is empty,
+    // or false if there is at least one floor in the queue
     emptyQueue() {
         let emptyQueue = true;
         for(let floor = this.lowestFloor; floor <= this.highestFloor; floor++) {
@@ -80,19 +59,21 @@ class Elevator {
             }
         }
         if(emptyQueue) {
-            this.movingUp = false;
-            this.movingDown = false;
+            this.goingUp = false;
+            this.goingDown = false;
         }
         return emptyQueue;
     }
 
+    // The queueFloor method is called by the floor buttons inside the elevator and by the ElevatorManager object
+    // It queues the floor given as a parameter
     queueFloor(floor) {
-        // If the elevator has a nalfunction, the floor is ot queued
+        // If the elevator has a malfunction, the floor is not queued
         if(this.elevatorMalfunction) {
             return false;
         }
 
-        // Checking that the elevator actually goes to the requested floor
+        // Checking that the requested floor is actually within the scope of the elevator
         if(floor < this.lowestFloor || floor > this.highestFloor) {
             return false;
         }
@@ -107,12 +88,12 @@ class Elevator {
         // If the elevator is moving up or down the floor is queued only if it is in the direction of travel
         if(!this.floorsQueue[floor]) {
             // If the elevator is moving up and the requested floor is above the elevator, it will be added to the target list
-            if(this.movingUp && floor > this.currentFloor) {
+            if(this.goingUp && floor > this.currentFloor) {
                 this.floorsQueue[floor] = true;
                 return true;
             }
             // If the elevator is moving down and the requested floor is below the elevator, it will be added to the target list
-            else if(this.movingDown && floor < this.currentFloor) {
+            else if(this.goingDown && floor < this.currentFloor) {
                 this.floorsQueue[floor] = true;
                 return true;
             }
@@ -125,8 +106,10 @@ class Elevator {
         }
     }
 
+    // This check is performed every time before the elevator moves to a floor
+    // It makes sure that there is no malfunction, that the elevator is not moving and that the doors are closed
     checkReadyToMove() {
-        if(!this.doorsOpen && !this.elevatorMalfunction) {
+        if(!this.doorsOpen && !this.elevatorMalfunction && !this.moving) {
             return true;
         }
         else {
@@ -134,42 +117,23 @@ class Elevator {
         }
     }
 
+    // This method is called any time a floor is added to an empty queue
+    // it makes the elevator process each floor in the queue until the queue is empty
     processQueue() {
-        console.log(`This is elevator ${this.name}, processing the request`)
         while(!this.emptyQueue()) {
             this.chooseNextFloor();
             this.moveToNextFloor();
         }
     }
-
-    moveToNextFloor() {
-        this.closeDoors();
-        if(this.checkReadyToMove()) {
-            let startingFloor = this.currentFloor;
-            // Going up
-            if(this.currentFloor < this.nextFloor) {
-                while(this.currentFloor < this.nextFloor) {
-                    pause(timeBetweenFloors);
-                    this.moveUp();
-                }
-            }
-            else if(this.currentFloor > this.nextFloor) {
-                while(this.currentFloor > this.nextFloor) {
-                    pause(timeBetweenFloors);
-                    this.moveDown();
-                }
-            }
-            this.stop();
-        }
-    }
-
+    // The chooseNextFloor() decides which to which floor in the queue the elevator will go
+    // It makes the decision by choosing the closest floor in the direction of movement of the elevator
     chooseNextFloor() {
         let closestFloorDistance = this.highestFloor - this.lowestFloor;
         let floorDistance;
         for(let floor = this.lowestFloor; floor <= this.highestFloor; floor++) {
             if(this.floorsQueue[floor]) {
                 // Choosing next floor when moving up
-                if(this.movingUp && floor > this.currentFloor) {
+                if(this.goingUp && floor > this.currentFloor) {
                     floorDistance = floor - this.currentFloor;
                     if(floorDistance <= closestFloorDistance) {
                         closestFloorDistance = floorDistance;
@@ -177,7 +141,7 @@ class Elevator {
                     }
                 }
                 // Choosing next floor when moving down
-                else if(this.movingDown && floor < this.currentFloor) {
+                else if(this.goingDown && floor < this.currentFloor) {
                     floorDistance = this.currentFloor - floor;
                     if(floorDistance <= closestFloorDistance) {
                         closestFloorDistance = floorDistance;
@@ -196,12 +160,12 @@ class Elevator {
         }
         // Stablishing moving up or moving down direction
         if(this.nextFloor > this.currentFloor) {
-            this.movingUp = true;
-            this.movingDown = false;
+            this.goingUp = true;
+            this.goingDown = false;
         }
         else {
-            this.movingUp = false;
-            this.movingDown = true;
+            this.goingUp = false;
+            this.goingDown = true;
         }
         // Checking that next floor is not beyond the scope of the elevator
         if(this.nextFloor > this.highestFloor) {
@@ -214,34 +178,78 @@ class Elevator {
         console.log(`Elevator ${this.name} moving to floor ${this.nextFloor}`);
     }
 
-    moveDown() {
-        this.currentFloor -= 1;
+    // Once a floor is chosen, the moveToNextFloor() method is called
+    // This method makes all the necessary checks before making the move up or down, closes
+    // the doors, makes the move and then opens the doors and console.logs the move 
+    moveToNextFloor() {
+        this.closeDoors();
+        if(this.checkReadyToMove()) {
+            this.moving = true;
+            let startingFloor = this.currentFloor;
+            // Going up
+            if(this.currentFloor < this.nextFloor) {
+                while(this.currentFloor < this.nextFloor) {
+                    pause(timeBetweenFloors);
+                    this.moveUp();
+                }
+            }
+            // Going down
+            else if(this.currentFloor > this.nextFloor) {
+                while(this.currentFloor > this.nextFloor) {
+                    pause(timeBetweenFloors);
+                    this.moveDown();
+                }
+            }
+            this.stop();
+            console.log(`Elevator ${this.name} moved from floor ${startingFloor} to floor ${this.currentFloor}`);
+        }
     }
 
+    // moveUp() moves the elevator up one floor
     moveUp() {
         this.currentFloor += 1;
     }
 
+    // moveDown() moves the elevator down one floor
+    moveDown() {
+        this.currentFloor -= 1;
+    }
+
+    // The stop() method is called every time the elevator has reached the destination floor
+    // It sets the moving variable to false, opens the doors and erases the current floor from the floors queue
     stop() {
+        this.moving = false;
         this.openDoors();
         this.floorsQueue[this.currentFloor] = false;
-        console.log(`Elevator ${this.name} moved from floor ${startingFloor} to floor ${this.currentFloor}`);
         pause(timeToWaitAtFloor);
     }
 
+    // The notifyMalfunction method must be called by any system that presents or detects a malfunction
+    // It sets the elevatorMalfunction variable to true and console.logs the malfunction, along with the name
+    // of the elevator and the current floor where it's located
     notifyMalfunction() {
         this.elevatorMalfunction = true;
-        this.openDoors();
         console.log(`Elevator ${this.name} has registered a malfunction on floor ${this.currentFloor}`);
     }
 
-    // [] emergencyButton() - If elevatorMalfunction is true, this button sends the elevator to the closest floor and opens the doors
+    // If elevatorMalfunction is true, this method sends the elevator to the closest floor and opens the doors
     emergencyButton() {
         if(this.elevatorMalfunction) {
-            this.openDoors();
+            if(this.moving) {
+                if(this.goingUp) {
+                    this.moveUp();
+                }
+                else if(this.goingDown) {
+                    this.moveDown();
+
+                }
+            }
+            this.stop();
         }
     }
 
+    // This method must be called after a malfunction in the elevator has been corrected
+    // It sets the elevatorMalfunction variable back to false
     resetButton() {
         if(this.doorsOpen && this.elevatorMalfunction) {
             this.elevatorMalfunction = false;
@@ -249,36 +257,7 @@ class Elevator {
     }
 }
 
-
-
-// Creating the doors class
-    // The doors class has the following parameters:
-        // [] doorMalfunction - If it's set to true, it triggers the notifyMalfunction() method of the corresponding elevator
-        // [] doorsOpen - True if doors are open. It is set to false the moment the order to close the doors is fired
-    // The doors class has the following methods:
-        // [] openDoors - If doorsOpen is set to false, it commands the doors to open. It takes one second to perform the operation
-        // [] closeDoors - If doorOpen is set to true, it commands the doors to close. It takes one second to perform the operation
-        // [] resetMalfunction - If doorsMalfunction was set to true, then this method sets it to false and executes the open doors method
-
-// Creating the floor class
-    // The Floor class the following parameters:
-        // [] floorNumber - Number of the floor
-        // [] upButton (boolean) - The floor is provided with an up button
-        // [] downButton (boolean) - The floor is provided with a down button
-        // [] upButtonOn (boolean) - The up button is on, there is a request to go up
-        // [] downButtonOn (boolean) - The down button is on, there is a request to go down
-    // Methods of the Floor class:
-        // [] goUpRequest 
-
 // Creating the elevator manager
-    // The elevator manager has the following functions:
-        // [] Checking that elevators are ready to be used
-        // [] Receiving elevator requests from floors
-        // [] Choosing the closest available elevator when and elevator is requested
-        // [] Keeping track of where each elevator is, and setting the currentFloor variable for each elevator as it moves
-        // [] Queuing all the elevator requests
-        // [] Requesting elevator B when a passenger pushes the up button in the 9th floor or makes a request from the 10 floor
-        // [] Requesting elevator A when a passenger pushes the down button in the lobby or makes a request from the basement
 class ElevatorManager {
     constructor(elevatorList = [], lowestFloor, highestFloor) {
         this.elevatorList = elevatorList;
@@ -298,10 +277,13 @@ class ElevatorManager {
         }
     }
 
+    // addElevator(elevator) allows to add a new Elevator object to the elevatorList array
     addElevator(elevator) {
         this.elevatorList.push(elevator);
     }
 
+    // emptyQueue() returns true if there are no elevator request in the floorsQueue array
+    // Otherwise it returns false
     emptyQueue() {
         let emptyQueue = true;
         for(let floor = this.lowestFloor; floor <= this.highestFloor; floor++) {
@@ -313,6 +295,8 @@ class ElevatorManager {
         return emptyQueue;
     }
 
+    // The newElevatorRequest(floor, direction) method is called by the buttons on each floor
+    // It adds the request to the floorsQueue array and calls the processQueue() method
     newElevatorRequest(floor, direction) {
         if(direction === "up" && !this.floorsQueue[floor].goingUp) {
             this.floorsQueue[floor].goingUp = true;
@@ -324,6 +308,8 @@ class ElevatorManager {
         this.processQueue();
     }
 
+    // The processQueue() method loops through all the floors and direction requests saved in the 
+    // floorsQueue array and calls the processRequest() method
     processQueue() {
         for(let floor = this.lowestFloor; floor <= this.highestFloor; floor++) {
             if(this.floorsQueue[floor].goingUp) {
@@ -335,21 +321,29 @@ class ElevatorManager {
         }
     }
 
+    // The processRequest(floor, goingUp, goingDown) method checks if any of the elevators can 
+    // attend a request. If both are available, it picks the closest elevator
     processRequest(floor, goingUp, goingDown) {
         let closestFloorDistance = this.highestFloor - this.lowestFloor;
         let floorDistance;
         let elevatorChoice;
         for(let elevator of this.elevatorList) {
-            // When a passenger requests an elevator their request might be satisfied immediately or queued.
-                // In order to send immediately an elevator to the passenger, the following must happen:
-                    // There is no elevator with doors open in that floor
-                    // There is an elevator available, with no target floors to go to
-                // In order to queue the passenger request, the following must happen
-                    // There is no elevator with doors open in that floor
-                    // There are no elevators available
-            // The request is only registered if there is no elevator with doors open on that floor
-            if(elevator.currentFloor !== floor || !elevator.doorsOpen) {
-
+            // First it is checked if there is an elevator available, with the doors open at the floor of the request
+            if(elevator.currentFloor === floor && elevator.doorsOpen && !elevator.elevatorMalfunction) {
+                // If there is an elevator available, then it is checked if its direction of movement 
+                // is compatible with the direction of the request
+                if(goingUp && elevator.goingUp || goingDown && elevator.goingDown || !elevator.goingUp && !elevator.goingDown) {
+                    // If this last condition is met, it means that the passenger can get into the elevator directly, and so
+                    // the request is deleted from the queue
+                    if(goingUp) {
+                        this.floorsQueue[floor].goingUp = false;
+                    }
+                    else if(goingDown) {
+                        this.floorsQueue[floor].goingDown = false;
+                    }
+                    // break out of the for loop
+                    break;
+                }
             }
 
             // If the elevator has a malfunction, the loop is continued and the elevator is not considered for the request
@@ -362,7 +356,7 @@ class ElevatorManager {
                 continue;
             }
 
-            // If the elevator is at idle, it is considered for queueing the request
+            // If the elevator is available, it is considered for queueing the request
             if(elevator.emptyQueue()) {
                 floorDistance = Math.abs(floor - elevator.currentFloor);
                 if(floorDistance <= closestFloorDistance) {
@@ -374,8 +368,8 @@ class ElevatorManager {
 
             // If the elevator is moving in the direction of the request and the floor is on its way,
             // the elevator is considered
-            if(elevator.movingUp && floor > elevator.currentFloor && goingUp || 
-            elevator.movingDown && floor < elevator.currentFloor && GoingDown) {
+            if(elevator.goingUp && floor > elevator.currentFloor && goingUp || 
+            elevator.goingDown && floor < elevator.currentFloor && GoingDown) {
                 floorDistance = Math.abs(floor - elevator.currentFloor);
                 if(floorDistance <= closestFloorDistance) {
                     closestFloorDistance = floorDistance;
@@ -396,74 +390,32 @@ class ElevatorManager {
             }
         }
         else {
-            console.log("No elevator was found :(")
+            console.log("No elevator was found, or it was immediately available for the passenger to get in");
         }
     }
 
-    takeElevatorIfAvailable(startingFloor, destinationFloor) {
-        let direction;
-        // Establishing the direction the passenger wants to travel
-        if(destinationFloor > startingFloor) {
-            direction = "up";
-        }
-        else if(destinationFloor < startingFloor) {
-            direction = "down";
-        }
-        else {
-            // If the passenger's starting floor and destination floor are the same, return false
-            return false;
-        }
-
+    // The checkElevatorStatus() console.logs the status of all the elevators in the building
+    // and returns an object with the most relevant information
+    checkElevatorsStatus() {
+        let status = []
         for(let elevator of this.elevatorList) {
-            // Checking that the elevator is at the floor as the passenger, functioning and with the doors open
-            if(elevator.doorsOpen && !elevator.elevatorMalfunction && elevator.currentFloor === floor) {
-                // Checking that the intended direction of travel of the passenger is compatible with that of the elevator
-                if(elevator.movingUp && direction === "up" || elevator.movingDown && direction === "down" || !elevator.movingUp && !elevator.movingDown) {
-                    // Queue the floor that the passenger wants to go to and return true
-                    elevator.queueFloor(destinationFloor);
-                    return true;
-                }               
+            let elevatorStatus = {
+                name: elevator.name,
+                malfunction: elevator.malfunction,
+                doorsOpen: elevator.doorsOpen,
+                currentFloor: elevator.currentFloor,
             }
+            status.push(elevatorStatus);
+            console.log(`Elevator ${elevator.name} is on floor ${elevator.currentFloor} ` +
+            `with the doors ${elevator.doorsOpen ? 'open' : 'closed'} and ` +
+            `${elevator.elevatorMalfunction ? 'has a malfunction' : 'is working properly'}`);            
         }
-        // If there was no elevator available, return false
-        return false;
-    }
-}
-
-// Creating the Passenger class
-    // The Passenger class contains the following variables:
-        // [] number - Number of the passenger
-        // [] startingFloor - Floor from which they request an elevator
-        // [] destinationFloor - Floor which they intend to go to
-        // [] startTimestamp - Time at which they start their journey
-        // [] endTimestamp - Time at which they end their journey
-        // [] waiting - It is set to true by the PassengerManager if the passenger pushed the elevator button and is waiting for it
-        // [] tripCompleted - It is set to true by the PassengerManager once the passenger has completed the trip
-    // The Passenger class has the following methods:
-        // [] getTotalTime - It gives the total time between startTimestamp and endTimestamp
-class Passenger {
-    constructor(number, startingFloor, destinationFloor, startTimestamp) {
-        this.number = number;
-        this.startingFloor = startingFloor;
-        this.destinationFloor = destinationFloor;
-        this.startTimestamp = startTimestamp;
-        this.endTimestamp = undefined;
-        this.waiting = false;
-        this.tripCompleted = false;
+        return status;
     }
 
-    getTotalTime() {
-        if(this.endTimestamp === undefined) {
-            console.log(`Passenger ${this.number} hasn't started the journey yet`);
-        } 
-        else {
-            console.log(`The total time for passenger ${this.number} was ${this.endTimestamp - this.endTimestamp} seconds`);
-        }
-    }
 }
 
 // Initial tests
-
 const elevatorA = new Elevator("A", -1, 9, 0);
 const elevatorB = new Elevator("B", 0, 10, 0);
 
@@ -474,73 +426,11 @@ elevatorManager.addElevator(elevatorB);
 
 elevatorManager.newElevatorRequest(5, "up");
 elevatorB.queueFloor(7);
-//elevatorB.elevatorMalfunction = true;
+//elevatorB.notifyMalfunction();
 elevatorManager.newElevatorRequest(3, "down");
+elevatorA.queueFloor(4);
 elevatorManager.newElevatorRequest(10, "down");
 //elevatorB.resetButton();
 elevatorManager.newElevatorRequest(9, "down");
 elevatorManager.newElevatorRequest(-1, "up");
-// Creating the testing manager
-    // The testing manager has the following functions:
-        // [] Create all 100 passengers which request elevators at random times
-        // [] Send elevator requests to the elevator manager
-        // [] Create random malFunction events (1 out of every 20 trips)
-        // [] Call the resetButton() method when a malFunction happens
-        // [] console.log the time of the passengers and also create an object which registers all the trips
-
-// Creating the array of passengers for the test
-const numberOfPassengers = 100;
-const simulationTime = 180;
-const passengerArray = [];
-for(let passengerNumber = 0; passengerNumber < numberOfPassengers; passengerNumber++) {
-    let startFloor = Math.floor((Math.random()*(highestBuildingFloor - lowestBuildingFloor + 1) - 1));
-    let destFloor = Math.floor((Math.random()*(highestBuildingFloor - lowestBuildingFloor + 1) - 1));
-    let startTime = Math.floor((Math.random()*(simulationTime) + 1));
-    let passenger = new Passenger(passengerNumber,startFloor, destFloor, startTime);
-    passengerArray.push(passenger);  
-}
-
-// Starting the test
-const testStartTime = new Date();
-for(passenger of passengerArray) {
-    let direction;
-    if(passenger.destinationFloor > passenger.startingFloor) {
-        direction = "up";
-    }
-    else if(passenger.destinationFloor < passenger.startingFloor) {
-        direction = "down";
-    }
-    if(passenger.destinationFloor !== passenger.startingFloor) {
-        let passengerInterval = testStartTime + (passenger.startTimeStamp * 1000) - new Date();
-        setTimeout(elevatorManager.newElevatorRequest, passengerInterval, passenger.destinationFloor, direction);
-    }
-    else {
-        passenger.endTimestamp = passenger.startTimestamp;
-    }
-}
-
-class PassengerManager {
-    constructor(passengerList) {
-        this.passengerList = passengerList;
-        this.startingTime = new Date();
-        this.waitingPassengersQueue = {};
-    }
-
-    passengerQueue() {
-        let completedTrips = 0;
-        while(completedTrips < this.passengerList.length) {
-            for(passenger of this.passengerList) {
-                // First check if the passenger has completed the trip. Go to the next passenger if true
-                if(passenger.tripCompleted) {
-                    continue;
-                }
-                // Then check if the passenger is waiting and if true, check if there is an elevator in their floor
-                if(passenger.waiting) {
-                    if(ElevatorManager.takeElevatorIfAvailable(passenger.startingFloor, passenger.destinationFloor)) {
-                        passenger.waiting = false;
-                    }
-                }
-            }
-        }
-    }
-}
+elevatorManager.checkElevatorsStatus();
