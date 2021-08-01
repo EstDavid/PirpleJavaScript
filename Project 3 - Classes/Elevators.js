@@ -1,6 +1,8 @@
 // Defining the basic parameters of the building
 const lowestBuildingFloor = -1;
 const highestBuildingFloor = 10;
+const timeBetweenFloors = 1000; // It takes 1 second for an elevator to travel between floors
+const timeToWaitAtFloor = 1500; // The elevator will wait 1.5 seconds when arriving to a floor for the passengers to get in
 
 // Creating a pausing function for controlling the movement of the elevators
 function pause(interval) {
@@ -147,18 +149,17 @@ class Elevator {
             // Going up
             if(this.currentFloor < this.nextFloor) {
                 while(this.currentFloor < this.nextFloor) {
-                    pause(1000);
+                    pause(timeBetweenFloors);
                     this.moveUp();
                 }
             }
             else if(this.currentFloor > this.nextFloor) {
                 while(this.currentFloor > this.nextFloor) {
-                    pause(1000);
+                    pause(timeBetweenFloors);
                     this.moveDown();
                 }
             }
             this.stop();
-            console.log(`Elevator ${this.name} moved from floor ${startingFloor} to floor ${this.currentFloor}`);
         }
     }
 
@@ -224,6 +225,8 @@ class Elevator {
     stop() {
         this.openDoors();
         this.floorsQueue[this.currentFloor] = false;
+        console.log(`Elevator ${this.name} moved from floor ${startingFloor} to floor ${this.currentFloor}`);
+        pause(timeToWaitAtFloor);
     }
 
     notifyMalfunction() {
@@ -396,6 +399,35 @@ class ElevatorManager {
             console.log("No elevator was found :(")
         }
     }
+
+    takeElevatorIfAvailable(startingFloor, destinationFloor) {
+        let direction;
+        // Establishing the direction the passenger wants to travel
+        if(destinationFloor > startingFloor) {
+            direction = "up";
+        }
+        else if(destinationFloor < startingFloor) {
+            direction = "down";
+        }
+        else {
+            // If the passenger's starting floor and destination floor are the same, return false
+            return false;
+        }
+
+        for(let elevator of this.elevatorList) {
+            // Checking that the elevator is at the floor as the passenger, functioning and with the doors open
+            if(elevator.doorsOpen && !elevator.elevatorMalfunction && elevator.currentFloor === floor) {
+                // Checking that the intended direction of travel of the passenger is compatible with that of the elevator
+                if(elevator.movingUp && direction === "up" || elevator.movingDown && direction === "down" || !elevator.movingUp && !elevator.movingDown) {
+                    // Queue the floor that the passenger wants to go to and return true
+                    elevator.queueFloor(destinationFloor);
+                    return true;
+                }               
+            }
+        }
+        // If there was no elevator available, return false
+        return false;
+    }
 }
 
 // Creating the Passenger class
@@ -405,6 +437,8 @@ class ElevatorManager {
         // [] destinationFloor - Floor which they intend to go to
         // [] startTimestamp - Time at which they start their journey
         // [] endTimestamp - Time at which they end their journey
+        // [] waiting - It is set to true by the PassengerManager if the passenger pushed the elevator button and is waiting for it
+        // [] tripCompleted - It is set to true by the PassengerManager once the passenger has completed the trip
     // The Passenger class has the following methods:
         // [] getTotalTime - It gives the total time between startTimestamp and endTimestamp
 class Passenger {
@@ -414,6 +448,8 @@ class Passenger {
         this.destinationFloor = destinationFloor;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = undefined;
+        this.waiting = false;
+        this.tripCompleted = false;
     }
 
     getTotalTime() {
@@ -480,5 +516,31 @@ for(passenger of passengerArray) {
     }
     else {
         passenger.endTimestamp = passenger.startTimestamp;
+    }
+}
+
+class PassengerManager {
+    constructor(passengerList) {
+        this.passengerList = passengerList;
+        this.startingTime = new Date();
+        this.waitingPassengersQueue = {};
+    }
+
+    passengerQueue() {
+        let completedTrips = 0;
+        while(completedTrips < this.passengerList.length) {
+            for(passenger of this.passengerList) {
+                // First check if the passenger has completed the trip. Go to the next passenger if true
+                if(passenger.tripCompleted) {
+                    continue;
+                }
+                // Then check if the passenger is waiting and if true, check if there is an elevator in their floor
+                if(passenger.waiting) {
+                    if(ElevatorManager.takeElevatorIfAvailable(passenger.startingFloor, passenger.destinationFloor)) {
+                        passenger.waiting = false;
+                    }
+                }
+            }
+        }
     }
 }
